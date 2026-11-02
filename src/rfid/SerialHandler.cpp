@@ -9,8 +9,15 @@ void SerialHandler::message(const String &text)
     Serial.println(text);
 }
 
-void SerialHandler::handleEvent(const RFIDEvent &event)
+void SerialHandler::handleEvent(
+    const RFIDEvent &event,
+    const char* pepperName
+)
 {
+    Serial.print("[");
+    Serial.print(pepperName);
+    Serial.print("] ");
+
     if (event.added)
     {
         Serial.print("OBJECT ADDED: ");

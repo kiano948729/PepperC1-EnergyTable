@@ -7,6 +7,11 @@ class SerialHandler
 {
 public:
     void begin();
+
     void message(const String &text);
-    void handleEvent(const RFIDEvent &event);
+
+    void handleEvent(
+        const RFIDEvent &event,
+        const char* pepperName
+    );
 };
