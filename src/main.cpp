@@ -32,62 +32,62 @@ SectionComets leds(14, 300, 80);
 
 void handleSyncCommand(const String &line)
 {
-    // Python vraagt of de ESP32 klaar is.
-    if (line == "HELLO")
+  // Python vraagt of de ESP32 klaar is.
+  if (line == "HELLO")
+  {
+    if (!csvReady)
     {
-        if (!csvReady)
-        {
-            Serial.println("SYNC_ERROR\tSTORAGE_NOT_READY");
-            return;
-        }
-
-        Serial.println("SYNC_READY");
-
-        // Stuur alle bestaande tags naar de computer.
-        csv.sendAll(Serial);
-        return;
+      Serial.println("SYNC_ERROR\tSTORAGE_NOT_READY");
+      return;
     }
 
-    if (!line.startsWith("SET\t"))
-        return;
+    Serial.println("SYNC_READY");
 
-    int first = line.indexOf('\t');
-    int second = line.indexOf('\t', first + 1);
-    int third = line.indexOf('\t', second + 1);
+    // Stuur alle bestaande tags naar de computer.
+    csv.sendAll(Serial);
+    return;
+  }
 
-    if (first < 0 || second < 0 || third < 0 || !csvReady)
-    {
-        Serial.println("SYNC_ERROR\tBAD_COMMAND_OR_STORAGE");
-        return;
-    }
+  if (!line.startsWith("SET\t"))
+    return;
 
-    String uid = line.substring(first + 1, second);
-    String consumption = line.substring(second + 1, third);
-    String generation = line.substring(third + 1);
+  int first = line.indexOf('\t');
+  int second = line.indexOf('\t', first + 1);
+  int third = line.indexOf('\t', second + 1);
 
-    uid.trim();
-    consumption.trim();
-    generation.trim();
+  if (first < 0 || second < 0 || third < 0 || !csvReady)
+  {
+    Serial.println("SYNC_ERROR\tBAD_COMMAND_OR_STORAGE");
+    return;
+  }
 
-    if (uid.length() == 0 ||
-        uid.indexOf(',') >= 0 ||
-        consumption.indexOf(',') >= 0 ||
-        generation.indexOf(',') >= 0)
-    {
-        Serial.println("SYNC_ERROR\tINVALID_FIELD");
-        return;
-    }
+  String uid = line.substring(first + 1, second);
+  String consumption = line.substring(second + 1, third);
+  String generation = line.substring(third + 1);
 
-    bool wasAdded = false;
+  uid.trim();
+  consumption.trim();
+  generation.trim();
 
-    if (!csv.ensureTag(uid, wasAdded) ||
-        !csv.updateTagData(uid, consumption, generation))
-    {
-        Serial.println("SYNC_ERROR\tWRITE_FAILED");
-        return;
-    }
+  if (uid.length() == 0 ||
+      uid.indexOf(',') >= 0 ||
+      consumption.indexOf(',') >= 0 ||
+      generation.indexOf(',') >= 0)
+  {
+    Serial.println("SYNC_ERROR\tINVALID_FIELD");
+    return;
+  }
 
-    Serial.println("SYNC_OK");
+  bool wasAdded = false;
+
+  if (!csv.ensureTag(uid, wasAdded) ||
+      !csv.updateTagData(uid, consumption, generation))
+  {
+    Serial.println("SYNC_ERROR\tWRITE_FAILED");
+    return;
+  }
+
+  Serial.println("SYNC_OK");
 }
 
 // --------------------------------------------------
@@ -96,28 +96,28 @@ void handleSyncCommand(const String &line)
 
 void handleSyncSerial()
 {
-    while (Serial.available())
-    {
-        char c = (char)Serial.read();
+  while (Serial.available())
+  {
+    char c = (char)Serial.read();
 
-        if (c == '\n' || c == '\r')
-        {
-            if (syncInputLine.length() > 0)
-            {
-                handleSyncCommand(syncInputLine);
-                syncInputLine = "";
-            }
-        }
-        else if (syncInputLine.length() < 240)
-        {
-            syncInputLine += c;
-        }
-        else
-        {
-            syncInputLine = "";
-            Serial.println("SYNC_ERROR\tLINE_TOO_LONG");
-        }
+    if (c == '\n' || c == '\r')
+    {
+      if (syncInputLine.length() > 0)
+      {
+        handleSyncCommand(syncInputLine);
+        syncInputLine = "";
+      }
     }
+    else if (syncInputLine.length() < 240)
+    {
+      syncInputLine += c;
+    }
+    else
+    {
+      syncInputLine = "";
+      Serial.println("SYNC_ERROR\tLINE_TOO_LONG");
+    }
+  }
 }
 
 // --------------------------------------------------
@@ -128,57 +128,57 @@ void handlePepperEvents(
     RFIDManager &rfid,
     const char *pepperName)
 {
-    RFIDEvent event;
+  RFIDEvent event;
 
-    while (rfid.getEvent(event))
+  while (rfid.getEvent(event))
+  {
+    output.handleEvent(event, pepperName);
+
+    if (!event.added)
+      continue;
+
+    if (!csvReady)
     {
-        output.handleEvent(event, pepperName);
-
-        if (!event.added)
-            continue;
-
-        if (!csvReady)
-        {
-            output.message("CSV ERROR: STORAGE NOT READY");
-            continue;
-        }
-
-        bool wasAdded = false;
-
-        if (csv.ensureTag(event.uid, wasAdded))
-        {
-            if (wasAdded)
-            {
-                output.message(
-                    "CSV: NEW UID SAVED: " + event.uid);
-            }
-            else
-            {
-                output.message(
-                    "CSV: UID ALREADY EXISTS: " + event.uid);
-            }
-
-            TagData data;
-
-            if (csv.getTagData(event.uid, data))
-            {
-                output.message(
-                    "CONSUMPTION=" + data.consumption +
-                    " | GENERATION=" + data.generation);
-
-                // Machineleesbare melding voor Python.
-                Serial.println(
-                    "TAG\t" + data.uid + "\t" +
-                    data.consumption + "\t" +
-                    data.generation);
-            }
-        }
-        else
-        {
-            output.message(
-                "CSV ERROR: COULD NOT SAVE UID: " + event.uid);
-        }
+      output.message("CSV ERROR: STORAGE NOT READY");
+      continue;
     }
+
+    bool wasAdded = false;
+
+    if (csv.ensureTag(event.uid, wasAdded))
+    {
+      if (wasAdded)
+      {
+        output.message(
+            "CSV: NEW UID SAVED: " + event.uid);
+      }
+      else
+      {
+        output.message(
+            "CSV: UID ALREADY EXISTS: " + event.uid);
+      }
+
+      TagData data;
+
+      if (csv.getTagData(event.uid, data))
+      {
+        output.message(
+            "CONSUMPTION=" + data.consumption +
+            " | GENERATION=" + data.generation);
+
+        // Machineleesbare melding voor Python.
+        Serial.println(
+            "TAG\t" + data.uid + "\t" +
+            data.consumption + "\t" +
+            data.generation);
+      }
+    }
+    else
+    {
+      output.message(
+          "CSV ERROR: COULD NOT SAVE UID: " + event.uid);
+    }
+  }
 }
 
 // --------------------------------------------------
@@ -187,55 +187,55 @@ void handlePepperEvents(
 
 void setup()
 {
-    Serial.begin(115200);
+  Serial.begin(115200);
 
-    // Pepper 1
-    PepperSerial1.begin(
-        115200,
-        SERIAL_8N1,
-        16,
-        17);
+  // Pepper 1
+  PepperSerial1.begin(
+      115200,
+      SERIAL_8N1,
+      16,
+      17);
 
-    // Pepper 2
-    PepperSerial2.begin(
-        115200,
-        SERIAL_8N1,
-        32,
-        33);
+  // Pepper 2
+  PepperSerial2.begin(
+      115200,
+      SERIAL_8N1,
+      32,
+      33);
 
-    output.begin();
+  output.begin();
 
-    // LittleFS / CSV initialiseren
-    output.message("INITIALIZING LITTLEFS...");
+  // LittleFS / CSV initialiseren
+  output.message("INITIALIZING LITTLEFS...");
 
-    csvReady = csv.begin();
+  csvReady = csv.begin();
 
-    if (csvReady)
-    {
-        output.message("LITTLEFS READY");
-        output.message("CSV STORAGE READY");
-    }
-    else
-    {
-        output.message("ERROR: LITTLEFS MOUNT FAILED");
-        output.message("CHECK FILESYSTEM IMAGE");
-    }
+  if (csvReady)
+  {
+    output.message("LITTLEFS READY");
+    output.message("CSV STORAGE READY");
+  }
+  else
+  {
+    output.message("ERROR: LITTLEFS MOUNT FAILED");
+    output.message("CHECK FILESYSTEM IMAGE");
+  }
 
-    // RFID initialiseren
-    rfid1.begin();
-    rfid2.begin();
+  // RFID initialiseren
+  rfid1.begin();
+  rfid2.begin();
 
-    output.message("ENERGY TABLE READY");
+  output.message("ENERGY TABLE READY");
 
-    // De synchronisatie start zodra Python HELLO verstuurt.
+  // De synchronisatie start zodra Python HELLO verstuurt.
 
-    output.message("PEPPER 1 CONNECTED");
-    output.message("PEPPER 2 CONNECTED");
+  output.message("PEPPER 1 CONNECTED");
+  output.message("PEPPER 2 CONNECTED");
 
-    // LEDs initialiseren
-    leds.begin();
+  // LEDs initialiseren
+  leds.begin();
 
-    int section = leds.addSectionRange(0, 300);
+  int section = leds.addSectionRange(0, 300);
 
   for (int i = 0; i < 20; ++i)
   {
@@ -287,18 +287,6 @@ void setup()
   // leds.addComet(section3, cometHeat);
 
   output.message("ENERGY TABLE READY");
-    CometOptions comet;
-
-    comet.color = {80, 0, 0};
-    comet.direction = 1;
-    comet.speed = 2.0f;
-    comet.tailLength = 3;
-    comet.gap = 0;
-    comet.position = 0.0f;
-    comet.showHead = false;
-    comet.paused = false;
-
-    leds.addComet(section, comet);
 }
 
 int direction = 1;
@@ -306,21 +294,16 @@ int brightnessIndex = 0;
 
 void loop()
 {
-    // CSV-commando's vanaf de computer verwerken.
-    handleSyncSerial();
+  // CSV-commando's vanaf de computer verwerken.
+  handleSyncSerial();
 
-    // Beide RFID-readers uitlezen.
-    rfid1.update();
-    rfid2.update();
+  // Beide RFID-readers uitlezen.
+  rfid1.update();
+  rfid2.update();
 
-    // Beide Peppers gebruiken dezelfde CSV.
-    handlePepperEvents(rfid1, "PEPPER 1");
-    handlePepperEvents(rfid2, "PEPPER 2");
+  // Beide Peppers gebruiken dezelfde CSV.
+  handlePepperEvents(rfid1, "PEPPER 1");
+  handlePepperEvents(rfid2, "PEPPER 2");
 
-  // leds.blink({(brightnessIndex * random()), (brightnessIndex * random()), (brightnessIndex * random())}, -1);
-  // brightnessIndex += direction;
-  // if (brightnessIndex >= 80 || brightnessIndex <= 0)
-  // {
-  //   direction *= -1;
-  // }
+  leds.update();
 }
