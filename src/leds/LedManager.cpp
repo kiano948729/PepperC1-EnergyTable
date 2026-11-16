@@ -332,6 +332,7 @@ void SectionComets::blink(SectionColor color, uint32_t periodMs)
     const bool on = (millis() % periodMs) < periodMs / 2;
     strip_->ClearTo(on ? RgbColor(cap(color.red), cap(color.green), cap(color.blue))
                        : RgbColor(0, 0, 0));
+    show();
 }
 
 void SectionComets::colorBlink(SectionColor a, SectionColor b, uint32_t periodMs)
