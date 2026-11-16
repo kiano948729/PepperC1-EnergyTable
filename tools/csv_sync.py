@@ -298,34 +298,37 @@ def main():
             write_timeout=2
         ) as port:
 
-            # Openen van COM3 reset meestal de ESP32.
-            # Wachten totdat de firmware gereed is.
+           # Python vraagt actief of de ESP32 klaar is.
 
             ready = False
             deadline = time.time() + 30
+            last_hello = 0
 
             while time.time() < deadline and not ready:
 
+                if time.time() - last_hello >= 1:
+                    port.write(b"HELLO\n")
+                    port.flush()
+                    last_hello = time.time()
+
                 raw = port.readline()
 
-                if not raw:
-                    continue
+                if raw:
+                    line = raw.decode(
+                        "utf-8",
+                        errors="replace"
+                    ).strip()
 
-                line = raw.decode(
-                    "utf-8",
-                    errors="replace"
-                ).strip()
+                    if line:
+                        print(f"[ESP32] {line}")
 
-                if line:
-                    print(f"[ESP32] {line}")
-
-                if line == "SYNC_READY":
-                    ready = True
+                    if line == "SYNC_READY":
+                        ready = True
 
             if not ready:
                 raise TimeoutError(
-                    "Geen SYNC_READY ontvangen. "
-                    "Controleer USB, COM3 en firmware."
+                    "ESP32 reageert niet op HELLO. "
+                    "Controleer COM3 en de firmware."
                 )
 
             # Eerst de bestaande ESP32-gegevens ophalen.

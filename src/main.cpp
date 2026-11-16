@@ -26,13 +26,28 @@ String syncInputLine;
 // LED manager
 SectionComets leds(14, 300, 80);
 
-
 // --------------------------------------------------
 // SYNCHRONISATIE: COMPUTER -> ESP32
 // --------------------------------------------------
 
 void handleSyncCommand(const String &line)
 {
+    // Python vraagt of de ESP32 klaar is.
+    if (line == "HELLO")
+    {
+        if (!csvReady)
+        {
+            Serial.println("SYNC_ERROR\tSTORAGE_NOT_READY");
+            return;
+        }
+
+        Serial.println("SYNC_READY");
+
+        // Stuur alle bestaande tags naar de computer.
+        csv.sendAll(Serial);
+        return;
+    }
+
     if (!line.startsWith("SET\t"))
         return;
 
@@ -54,14 +69,10 @@ void handleSyncCommand(const String &line)
     consumption.trim();
     generation.trim();
 
-    // Komma's, tabs en regeleinden zijn niet toegestaan.
     if (uid.length() == 0 ||
         uid.indexOf(',') >= 0 ||
         consumption.indexOf(',') >= 0 ||
-        generation.indexOf(',') >= 0 ||
-        uid.indexOf('\t') >= 0 ||
-        consumption.indexOf('\t') >= 0 ||
-        generation.indexOf('\t') >= 0)
+        generation.indexOf(',') >= 0)
     {
         Serial.println("SYNC_ERROR\tINVALID_FIELD");
         return;
@@ -78,7 +89,6 @@ void handleSyncCommand(const String &line)
 
     Serial.println("SYNC_OK");
 }
-
 
 // --------------------------------------------------
 // SERIELE INPUT VERWERKEN
@@ -110,15 +120,13 @@ void handleSyncSerial()
     }
 }
 
-
 // --------------------------------------------------
 // RFID EVENTS VERWERKEN
 // --------------------------------------------------
 
 void handlePepperEvents(
     RFIDManager &rfid,
-    const char *pepperName
-)
+    const char *pepperName)
 {
     RFIDEvent event;
 
@@ -142,14 +150,12 @@ void handlePepperEvents(
             if (wasAdded)
             {
                 output.message(
-                    "CSV: NEW UID SAVED: " + event.uid
-                );
+                    "CSV: NEW UID SAVED: " + event.uid);
             }
             else
             {
                 output.message(
-                    "CSV: UID ALREADY EXISTS: " + event.uid
-                );
+                    "CSV: UID ALREADY EXISTS: " + event.uid);
             }
 
             TagData data;
@@ -158,26 +164,22 @@ void handlePepperEvents(
             {
                 output.message(
                     "CONSUMPTION=" + data.consumption +
-                    " | GENERATION=" + data.generation
-                );
+                    " | GENERATION=" + data.generation);
 
                 // Machineleesbare melding voor Python.
                 Serial.println(
                     "TAG\t" + data.uid + "\t" +
                     data.consumption + "\t" +
-                    data.generation
-                );
+                    data.generation);
             }
         }
         else
         {
             output.message(
-                "CSV ERROR: COULD NOT SAVE UID: " + event.uid
-            );
+                "CSV ERROR: COULD NOT SAVE UID: " + event.uid);
         }
     }
 }
-
 
 // --------------------------------------------------
 // SETUP
@@ -192,16 +194,14 @@ void setup()
         115200,
         SERIAL_8N1,
         16,
-        17
-    );
+        17);
 
     // Pepper 2
     PepperSerial2.begin(
         115200,
         SERIAL_8N1,
         32,
-        33
-    );
+        33);
 
     output.begin();
 
@@ -227,14 +227,7 @@ void setup()
 
     output.message("ENERGY TABLE READY");
 
-    if (csvReady)
-    {
-        // Python wacht op dit bericht.
-        Serial.println("SYNC_READY");
-
-        // Bestaande ESP32-data naar de computer sturen.
-        csv.sendAll(Serial);
-    }
+    // De synchronisatie start zodra Python HELLO verstuurt.
 
     output.message("PEPPER 1 CONNECTED");
     output.message("PEPPER 2 CONNECTED");
@@ -257,7 +250,6 @@ void setup()
 
     leds.addComet(section, comet);
 }
-
 
 // --------------------------------------------------
 // LOOP
