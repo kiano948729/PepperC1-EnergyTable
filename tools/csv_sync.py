@@ -33,6 +33,8 @@ CSV_PATH = (
 
 POLL_SECONDS = 0.25
 
+CSV_DELIMITER = ","
+
 
 # --------------------------------------------------
 # CSV FUNCTIES
@@ -49,6 +51,24 @@ def clean(value):
     return value
 
 
+def detect_delimiter():
+    """Herkent of het bestand met komma's of puntkomma's is opgeslagen."""
+    global CSV_DELIMITER
+
+    with CSV_PATH.open("r", encoding="utf-8-sig") as f:
+        first_line = f.readline()
+
+    if ";" in first_line and "," not in first_line:
+        CSV_DELIMITER = ";"
+    else:
+        CSV_DELIMITER = ","
+
+
+def clean_number(value):
+    """Decimale komma (1,5) omzetten naar punt (1.5) voor de ESP32."""
+    return clean((value or "").replace(",", "."))
+
+
 def read_csv():
     rows = {}
 
@@ -61,13 +81,15 @@ def read_csv():
                 ["UID", "Consumption", "Generation"]
             )
 
+    detect_delimiter()
+
     with CSV_PATH.open(
         "r",
         newline="",
         encoding="utf-8-sig"
     ) as f:
 
-        reader = csv.DictReader(f)
+        reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
 
         required = {
             "UID",
@@ -90,8 +112,8 @@ def read_csv():
                 continue
 
             rows[uid] = (
-                clean(row.get("Consumption", "")),
-                clean(row.get("Generation", ""))
+                clean_number(row.get("Consumption", "")),
+                clean_number(row.get("Generation", ""))
             )
 
     return rows
@@ -114,7 +136,7 @@ def write_csv(rows):
             encoding="utf-8"
         ) as f:
 
-            writer = csv.writer(f)
+            writer = csv.writer(f, delimiter=CSV_DELIMITER)
 
             writer.writerow(
                 ["UID", "Consumption", "Generation"]
@@ -143,6 +165,11 @@ def parse_tag_line(line):
         return None
 
     parts = line.split("\t")
+
+    # .strip() in de aanroeper haalt lege velden aan het eind weg:
+    # "TAG\tUID\t\t" wordt "TAG\tUID". Daarom aanvullen tot 4 delen.
+    while len(parts) < 4:
+        parts.append("")
 
     if len(parts) != 4:
         return None
